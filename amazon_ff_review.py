@@ -6,7 +6,7 @@ from sklearn.model_selection import KFold
 import json
 from sklearn import metrics
 from sklearn.model_selection import cross_val_score
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support,mean_squared_error
 import time
 import sqlite3
 import nltk
@@ -23,6 +23,7 @@ from sklearn.ensemble import RandomForestClassifier
 from functools import reduce
 from sklearn.utils import resample
 from sklearn.model_selection import train_test_split
+import sprint6
 #%%
 # con=sqlite3.connect('database.sqlite')
 # #df=pd.read_sql('Select * from Reviews',con=con,chunksize=10000)
@@ -61,25 +62,30 @@ def get_reviews():
 def preprocess_and_get_sentiments(cleaned_review=None,sample=None,threshold=0):
     cleaned_review['Score']=sample['Score']
     cleaned_review['Summary']=sample['Summary']
+    ######################Preprocessing###########################
     stop_words=set(stopwords.words("english"))
     punc = list(string.punctuation)
     punc.extend(["`","``","''","..."])
+    ##################################################
     i=0
     sentiment_result=[]
     sentiment_polarity=[]
 
     for review in sample['Summary']:
         #print(review)
-        
-        review=word_tokenize(review)
-        review=[word for word in review if word not in stop_words] #Removing stop words
-        review=[word for word in review if word not in punc] #Removing punctuations
+        ##################Preprocessing########################
+        # review=word_tokenize(review)
+        # review=[word for word in review if word not in stop_words] #Removing stop words
+        # review=[word for word in review if word not in punc] #Removing punctuations
+        # if len(review)>0:
+        #     filtered_review=reduce(lambda a,b:a+' '+b,review)
+        # else:
+        #     filtered_review=''
         if len(review)>0:
-            filtered_review=reduce(lambda a,b:a+' '+b,review)
+            filtered_review=review
         else:
             filtered_review=''
-        
-        
+        #############################################
         sentiment = TextBlob(filtered_review).sentiment
         print(f'Sentiment={sentiment}')
         s=get_sentiments_from_polarity(sentiment.polarity,threshold)
@@ -213,7 +219,7 @@ def train_core(model=None,X=None,y=None,stratify=None,n=5):
             kscores.append(ks)
             best_model_index=kscores.index(max(kscores))
         else:
-            ks=metrics.mean_squared_error(yk_test,yk_pred)
+            ks=mean_squared_error(yk_test,yk_pred)
             kscores.append(ks)
             best_model_index=kscores.index(min(kscores))
 
@@ -230,17 +236,17 @@ def train_core(model=None,X=None,y=None,stratify=None,n=5):
 #%%
 def run():
     cleaned_review,sample,df=get_reviews()
-    sample_helpful=resample(df,n_samples=25000,replace=False,stratify=df['Score'])
+    sample_helpful=resample(df,n_samples=10000,replace=False,stratify=df['Score'])
     #print(sample.head())
     #print(sample_helpful.head())
     cleaned_review_helpful=cleaned_review
-    cleaned_review,sample=preprocess_and_get_sentiments(cleaned_review=cleaned_review,sample=sample,threshold=0.2)
+    cleaned_review,sample=preprocess_and_get_sentiments(cleaned_review=cleaned_review,sample=sample,threshold=0.5)
     review_df=concat_sentiments(cleaned_review,sample)
     y=review_df['Score']
     X=review_df
     X=X.drop(columns=['UserId','Score','ProfileName','Time'],axis=1)
     ###########################################################
-    cleaned_review_helpful,sample_helpful=preprocess_and_get_sentiments(cleaned_review=cleaned_review_helpful,sample=sample_helpful,threshold=0.2)
+    cleaned_review_helpful,sample_helpful=preprocess_and_get_sentiments(cleaned_review=cleaned_review_helpful,sample=sample_helpful,threshold=0.5)
     review_df_helpful=concat_sentiments(cleaned_review_helpful,sample_helpful)
     #y_h=review_df_helpful['Score']
     #X_h=review_df_helpful
@@ -249,17 +255,24 @@ def run():
     X_helpful=X_helpful.drop(columns=['Helpful_Score'],axis=1)
 
     helpful_df=predict_helpfulness(X_helpful,y_helpful,X)
+    regression_error=mean_squared_error(y_helpful,helpful_df)
     ###########################################################
-    print(X.head)
+    #print(X.head)
+    helpful_df=pd.DataFrame(data=helpful_df,index=X.index,columns=['Helpful_Score'])
+    
     X['Helpful_Score']=helpful_df
     print("After adding predicted helpful scores")
     print(X.head)
     print("************* Training Final Reviews Model*****************")
-    model=RandomForestClassifier(n_estimators=10)
+    
+    models={}
+    model=RandomForestClassifier(criterion='gini',n_estimators=10)
+    models.update({'Random Forest':[model,{'hyper':{'criterion': 'gini','n_estimators':'10'}}]}) #,'Max_depth':'None','Min_samples_split':'2'
     metrics,cnf=train_model(model,X,y)
     print(metrics)
     print(cnf)
-    return X
+    # return X
+    return X,models,metrics,cnf,regression_error
 
 #%%
 from sklearn.linear_model import LinearRegression
@@ -275,6 +288,28 @@ def predict_helpfulness(X=None,y=None,train_data=None):
 # dummy_df=pd.get_dummies(X)
 
 #%%
-run()
+df,models,metrics,cnf,regression_error=run()
+for i in models.items():
+    m=i
+#%%
+def make_json(df=None,model_data=None,upsample=False,stratified_column=None,metrics=None,test_size=0.49,nfold=5):
+    ''' Preparation of Metadata in Dictionary Format'''
+    if upsample:
+        sampling='Upsampling'
+    else:
+        sampling='Stratified Sampling stratified on '+ stratified_column
+
+    encoding={'encoding_used':'One-Hot Encoding'}
+    data_meta_data={'Name':'Amazon Fine Food Reviews','Rows':len(df),'Columns Before Preprocessing':10,'Columns After Preprocessing & one hot encoding':len(df.columns),'Encoding':encoding,'Classification Type':"Multi-Class","Class Variable":'Score'}
+    training_charc={'Hyper Parameters':m[1][1]['hyper'],'Test_size':test_size,'No. of Cross Validation Folds Used':nfold,'Sampling':sampling}
+    meta_data={m[0]:{'Data_Meta_Data':data_meta_data,'Training Characteristics':training_charc,"Metrics":metrics}}
+
+    jfile='meta_data_'+str(np.random.randint(1,10000,1))+'.json'
+    return meta_data,jfile
+
+#%%
+meta_data,jfile=make_json(df=df,model_data=m,stratified_column='Score',metrics=metrics)
+sprint6.write_json(jfile,meta_data)
+
 
 #%%
