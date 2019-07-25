@@ -19,52 +19,61 @@ else:
 # external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 # app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-df = pd.read_csv("https://raw.githubusercontent.com/plotly/datasets/master/2011_us_ag_exports.csv")
-#df  =   pd.read_json('meta_data__model_1.json')
+#df = pd.read_csv("https://raw.githubusercontent.com/plotly/datasets/master/2011_us_ag_exports.csv")
+#df_list=['meta_data__model_1.json','meta_data__model_2.json','meta_data__model_3.json','meta_data__model_4.json',\
+    # 'meta_data__model_5.json']
+df_list=['meta_data_amzon_ff_model_2.json','meta_data_amzon_ff_model_9.json','meta_data_amzon_ff_model_11.json','meta_data_amzon_ff_model_15.json']
+
+df=[]
+for fname  in df_list:
+    path=os.getcwd()+'/amz_ff_run3/'
+    fil=path+fname
+    df.append(pd.read_json(fil))
 
 app.layout = html.Div([
     html.Div([html.H1("Performance Stats")],
              style={'textAlign': "center", "padding-bottom": "10", "padding-top": "10"}),
     html.Div(
-        [html.Div(dcc.Dropdown(id="select-xaxis", options=[{'label': i.title(), 'value': i} for i in df.columns[3:]],
-                               value='beef', ), className="four columns",
+        [html.Div(dcc.Dropdown(id="select-model", options=[{'label': df[i].columns[0].title(), 'value': [i,df[i].columns[0]]} for i in range(len(df)) ],
+                               value=[0,df[0].columns[0]], ), className="four columns",
                   style={"display": "block", "margin-left": "auto",
-                         "margin-right": "auto", "width": "33%"}),
-         html.Div(dcc.Dropdown(id="select-yaxis", options=[{'label': i.title(), 'value': i} for i in df.columns[3:]],
-                               value='pork', ), className="four columns",
-                  style={"display": "block", "margin-left": "auto",
-                         "margin-right": "auto", "width": "33%"}),
-         html.Div(dcc.Dropdown(id="select-zaxis", options=[{'label': i.title(), 'value': i} for i in df.columns[3:]],
-                               value='poultry', ), className="four columns",
-                  style={"display": "block", "margin-left": "auto",
-                         "margin-right": "auto", "width": "33%"})
-         ], className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
+                         "margin-right": "auto", "width": "33%"})],className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
                                     "margin-right": "auto", "width": "80%"}),
+    
     html.Div([dcc.Graph(id="my-graph")])
 ], className="container")
 
 
 @app.callback(
     dash.dependencies.Output("my-graph", "figure"),
-    [dash.dependencies.Input("select-xaxis", "value"),
-     dash.dependencies.Input("select-yaxis", "value"),
-     dash.dependencies.Input("select-zaxis", "value")]
+    [dash.dependencies.Input("select-model", "value"),]
 
 )
-def ugdate_figure(selected_x, selected_y, selected_z):
-    z = df[selected_z]
+
+def ugdate_figure(select_model):
+    model_name = select_model[1]#df.columns[0]
+    index = select_model[0]
+    print(index)
+    print(model_name)
+    model=df[index]
+    z = [model[model_name]['Metrics']['Error']]
+    y = [model[model_name]['Metrics']['Training_Time_in_s']]
+    x = [model[model_name]['Metrics']['Accuracy']]
+    
+    print(x,y,z)
     trace = [go.Scatter3d(
-        x=df[selected_x], y=df[selected_y], z=df[selected_z],
+        x=x,y=y,z=z,
         mode='markers', marker={'size': 8, 'color': z, 'colorscale': 'Blackbody', 'opacity': 0.8, "showscale": True,
                                 "colorbar": {"thickness": 15, "len": 0.5, "x": 0.8, "y": 0.6, }, })]
     return {"data": trace,
             "layout": go.Layout(
-                height=700, title=f"Exports<br>{selected_x.title(), selected_y.title(), selected_z.title()}",
+                height=700, title=f"Metrics<br>{'model='+model_name, 'training_time', 'accuracy'}",
                 paper_bgcolor="#f3f3f3",
-                scene={"aspectmode": "cube", "xaxis": {"title": f"{selected_x.title()} (USD)", },
-                       "yaxis": {"title": f"{selected_y.title()} (USD)", },
-                       "zaxis": {"title": f"{selected_z.title()} (USD)", }})
+                scene={"aspectmode": "cube", "xaxis": {"title": f"{'X:Accuracy'}", },
+                       "yaxis": {"title": f"{'Y:training_time'} (s)", },
+                       "zaxis": {"title": f"{'Z:Error'} ", }})
             }
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+
