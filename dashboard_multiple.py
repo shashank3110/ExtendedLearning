@@ -16,13 +16,6 @@ if 'DYNO' in os.environ:
     app_name = os.environ['DASH_APP_NAME']
 else:
     app_name = 'dash-3dscatterplot'
-# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
-# app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-#df = pd.read_csv("https://raw.githubusercontent.com/plotly/datasets/master/2011_us_ag_exports.csv")
-#df_list=['meta_data__model_1.json','meta_data__model_2.json','meta_data__model_3.json','meta_data__model_4.json',\
-    # 'meta_data__model_5.json']
-#df_list=['meta_data_amzon_ff_model_2.json','meta_data_amzon_ff_model_9.json','meta_data_amzon_ff_model_11.json','meta_data_amzon_ff_model_15.json']
 
 def read_path(df,path,dat):
     #print( os.listdir(path))
@@ -64,12 +57,7 @@ app.layout = html.Div([
                   style={"display": "block", "margin-left": "auto",
                          "margin-right": "auto", "width": "33%"})],className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
                                     "margin-right": "auto", "width": "80%"}),
-        # [html.Div(dcc.Dropdown(id="select-model", options=[{'label': df[i].columns[0].title(), 'value': [i,df[i].columns[0]]} for i in range(len(df)) ],
-        #                        value=[0,df[0].columns[0]], ), className="four columns",
-        #           style={"display": "block", "margin-left": "auto",
-        #                  "margin-right": "auto", "width": "33%"})],className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
-        #                             "margin-right": "auto", "width": "80%"}),
-    
+        
     html.Div([dcc.Graph(id="my-graph")])
 ], className="container")
 
@@ -82,14 +70,7 @@ app.layout = html.Div([
 
 def update_figure(select_file):
     
-    # model_name = select_model[1]#df.columns[0]
-    # index = select_model[0]
-    # print(index)
-    # print(model_name)
-    # model=df[index]
-    # z = [model[model_name]['Metrics']['Error']]
-    # y = [model[model_name]['Metrics']['Training_Time_in_s']]
-    # x = [model[model_name]['Metrics']['Accuracy']]
+    
     names=['dummy']
     x,y,z=[0],[0],[0]  # the first entries of this list are dummmy values to \
                        #indicate the origin
