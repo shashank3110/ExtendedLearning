@@ -17,33 +17,43 @@ if 'DYNO' in os.environ:
 else:
     app_name = 'dash-3dscatterplot'
 
-def read_path(df,path,dat):
+def read_path(df,path,dat,al):
     #print( os.listdir(path))
-    files = [ fil for fil in os.listdir(path) if fil.endswith('.json')]
-    for f  in files:
-        f = path + '/'+f
-        print(f)
-        df[dat].append(pd.read_json(f))  
+    print(al)
+    for algos in al:
+        print(algos)
+        files = [ fil for fil in os.listdir(path) if fil.endswith('.json') and algos in fil]
+        for f  in files:
+            f = path + '/'+f
+            print(f)
+            df[dat].append(pd.read_json(f))  
     return df
 
-
+algo= ['Deep Learning','SVM','Random Forest','NB','SVC','Logistic']
+configs= ['config1','config2']
 data_folders = ['amz_ffr_json','bank_json','kick_json']
-df = {'amz_ffr_json': [],'bank_json': [],'kick_json': []}
-amz_sub_dir = ['baseline','baseline_bow','baseline_sentiment_bow','baseline_sentiment'] 
-config=['/config1','/config2']
-for fol in data_folders:
-    for con in config:
-        for alg in ['machine_learning','deep_learning']:
-            path=os.getcwd()+'/'+fol+'/json'+ con +'/'+ alg
-            if fol is 'amz_ffr_json':
-                for sub in amz_sub_dir:
-                    path_amz = path +'/'+ sub
-                    print(path_amz)
-                    df = read_path(df,path_amz,fol)
-            else:
-                print(path)
-                df = read_path(df,path,fol)
-print(df)
+
+def get_data(al,conf,data_folders):
+
+    #data_folders = ['amz_ffr_json','bank_json','kick_json']
+    df = {'amz_ffr_json': [],'bank_json': [],'kick_json': []}
+    amz_sub_dir = ['baseline','baseline_bow','baseline_sentiment_bow','baseline_sentiment'] 
+    config=['/config1','/config2']
+    for fol in data_folders:
+        for con in config:
+            if conf in con:
+                for alg in ['machine_learning','deep_learning']:
+                    path=os.getcwd()+'/'+fol+'/json'+ con +'/'+ alg
+                    if fol is 'amz_ffr_json':
+                        for sub in amz_sub_dir:
+                            path_amz = path +'/'+ sub
+                            print(path_amz)
+                            df = read_path(df,path_amz,fol,al)
+                    else:
+                        print(path)
+                        df = read_path(df,path,fol,al)
+    print(df)
+    return df
 
                  
 
@@ -57,6 +67,20 @@ app.layout = html.Div([
                   style={"display": "block", "margin-left": "auto",
                          "margin-right": "auto", "width": "33%"})],className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
                                     "margin-right": "auto", "width": "80%"}),
+    html.Div(
+        [html.Div(dcc.Dropdown(id="select-algo", options=[{'label': algo[0], 'value': algo[0]},{'label': algo[1], 'value': algo[1]},\
+            {'label': algo[2], 'value': algo[2]},{'label': algo[3], 'value': algo[3]},{'label': algo[4], 'value': algo[4]},\
+                {'label': algo[5], 'value': algo[5]}],
+                               value=['Deep'],multi=True ), className="four columns",
+                  style={"display": "block", "margin-left": "auto",
+                         "margin-right": "auto", "width": "33%"})],className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
+                                    "margin-right": "auto", "width": "80%"}),
+    html.Div(
+        [html.Div(dcc.Dropdown(id="select-config", options=[{'label': configs[0], 'value': configs[0]},{'label': configs[1], 'value': configs[1]}],\
+            value='config1',multi=False ), className="four columns",
+                  style={"display": "block", "margin-left": "auto",
+                         "margin-right": "auto", "width": "33%"})],className="row", style={"padding": 14, "display": "block", "margin-left": "auto",
+                                    "margin-right": "auto", "width": "80%"}),
         
     html.Div([dcc.Graph(id="my-graph")])
 ], className="container")
@@ -64,18 +88,22 @@ app.layout = html.Div([
 
 @app.callback(
     dash.dependencies.Output("my-graph", "figure"),
-    [dash.dependencies.Input("select-file", "value"),]#dash.dependencies.Input("select-model", "value"),]
+    [dash.dependencies.Input("select-file", "value"),\
+    dash.dependencies.Input("select-algo", "value"),\
+    dash.dependencies.Input("select-config", "value")]#dash.dependencies.Input("select-model", "value"),]
 
 )
 
-def update_figure(select_file):
+def update_figure(select_file,select_algo,select_config):
     
     
     names=['dummy']
     x,y,z=[0],[0],[0]  # the first entries of this list are dummmy values to \
                        #indicate the origin
     print(select_file)
+    df= get_data(select_algo,select_config,data_folders)
     frame = df[select_file]
+
     for model in frame:
         model_name=model.columns[0]
         names.append(model_name)
