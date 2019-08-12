@@ -6,6 +6,7 @@ import dash_html_components as html
 import pandas as pd
 import plotly.graph_objs as go
 import numpy as np
+import dash_table
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -58,7 +59,10 @@ def get_data(al,conf,data_folders):
 
                  
 
-app.layout = html.Div([
+app.layout = html.Div(
+    className = "row",
+    children = [
+    html.Div([
     html.Div([html.H1("Performance Stats")],
              style={'textAlign': "center", "padding-bottom": "10", "padding-top": "10"}),
     html.Div(
@@ -85,8 +89,26 @@ app.layout = html.Div([
                                     "margin-right": "auto", "width": "80%"}),
         
     html.Div([dcc.Graph(id="my-graph")])
-], className="container")
+], className="container"),
 
+html.Div(dash_table.DataTable(
+    id='my-table',
+    columns=[
+        {"name": col, "id": col} for col in ['Model Name','Accuracy','Precision','Training Time (in s)']
+    ],
+    
+))])
+
+def update_points_set(model,model_name):
+    if 'Amazon' in model[model_name]['Data_Meta_Data']['Name']:
+            avgPrecision = np.mean(model[model_name]['Metrics']['Precision'])
+            y_coordinate = avgPrecision
+    else:
+            y_coordinate = model[model_name]['Metrics']['Precision']
+    z_coordinate = model[model_name]['Metrics']['Training_Time_in_s']
+    x_coordinate = model[model_name]['Metrics']['Accuracy']
+
+    return x_coordinate,y_coordinate,z_coordinate
 
 @app.callback(
     dash.dependencies.Output("my-graph", "figure"),
@@ -122,13 +144,19 @@ def update_figure(select_file,select_algo,select_config):
         
         familyNames.append(color)
 
-        if 'Amazon' in model[model_name]['Data_Meta_Data']['Name']:
-            avgPrecision = np.mean(model[model_name]['Metrics']['Precision'])
-            y.append(avgPrecision)
-        else:
-            y.append(model[model_name]['Metrics']['Precision'])
-        z.append(model[model_name]['Metrics']['Training_Time_in_s'])
-        x.append(model[model_name]['Metrics']['Accuracy'])
+        x_coordinate,y_coordinate,z_coordinate = update_points_set(model,model_name)
+
+        x.append(x_coordinate)
+        y.append(y_coordinate)
+        z.append(z_coordinate)
+
+        # if 'Amazon' in model[model_name]['Data_Meta_Data']['Name']:
+        #     avgPrecision = np.mean(model[model_name]['Metrics']['Precision'])
+        #     y.append(avgPrecision)
+        # else:
+        #     y.append(model[model_name]['Metrics']['Precision'])
+        # z.append(model[model_name]['Metrics']['Training_Time_in_s'])
+        # x.append(model[model_name]['Metrics']['Accuracy'])
     
     
     #print(x,y,z,names)
@@ -139,12 +167,43 @@ def update_figure(select_file,select_algo,select_config):
         ysrc='0',zsrc='0',)]
     return {"data": trace,
             "layout": go.Layout(
-                height=700, title=f"Metrics<br>{'Dataset Name='+select_file, 'accuracy','Precision', 'training_time'}",
+                height=700, title=f"Metrics<br>{'Dataset Name='+select_file, 'accuracy','Precision', 'training_time','Number of Models= '+str(len(names)-1)}",
                 paper_bgcolor="#f3f3f3",
                 scene={"aspectmode": "cube", "xaxis": {"title": f"{'X:Accuracy'}", },
                        "yaxis": {"title": f"{'Y:Precision'}", },
                        "zaxis": {"title": f"{'Z:training_time'} (s) ", }})
             }
 
+@app.callback(
+    dash.dependencies.Output("my-table", "data"),
+    [dash.dependencies.Input("select-file", "value"),\
+    dash.dependencies.Input("select-algo", "value"),\
+    dash.dependencies.Input("select-config", "value")]
+)
+
+def update_table(select_file,select_algo,select_config):
+
+    df= get_data(select_algo,select_config,data_folders)
+    frame = df[select_file]
+    x,y,z, names =[],[],[],[]
+    cols = ['Model Name','Accuracy','Precision','Training Time (in s)']
+    for model in frame:
+        model_name=model.columns[0]
+        names.append(model_name)
+        
+        x_coordinate,y_coordinate,z_coordinate = update_points_set(model,model_name)
+
+        x.append(x_coordinate)
+        y.append(y_coordinate)
+        z.append(z_coordinate)
+    print(x,y,z,names)
+    data = pd.DataFrame(columns= cols,data = list(zip(*[names,x,y,z])))
+    data_list = data.to_dict('records')
+    print(data_list)
+    return data_list
+# {'data': [names,x,y,z]
+#     }
+
+
 if __name__ == '__main__':
-    app.run_server(debug=True,port=8055)
+    app.run_server(debug=True,port=8056)
